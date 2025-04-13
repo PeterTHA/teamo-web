@@ -1,0 +1,731 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth Models
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Core SaaS Models
+model User {
+  id                String             @id @default(cuid())
+  name              String?
+  email             String?            @unique
+  emailVerified     DateTime?
+  password          String?            // เก็บรหัสผ่านที่เข้ารหัสแล้วด้วย bcrypt
+  image             String?
+  role              UserRole           @default(USER)
+  status            UserStatus         @default(ACTIVE)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  lastLogin         DateTime?
+  
+  // Relations
+  accounts          Account[]
+  sessions          Session[]
+  employee          Employee?
+  activityLogs      ActivityLog[]
+  workspaceMember   WorkspaceMember[]
+  approvalActions   ApprovalAction[]
+  consents          UserConsent[]
+  auditLogs         AuditLog[]
+}
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+model Workspace {
+  id                  String             @id @default(cuid())
+  name                String
+  slug                String             @unique
+  logo                String?
+  address             String?
+  taxId               String?
+  phone               String?
+  email               String?
+  contactPerson       String?
+  status              WorkspaceStatus    @default(ACTIVE)
+  planType            PlanType           @default(FREE)
+  subscriptionStart   DateTime?
+  subscriptionEnd     DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  
+  // Relations
+  members             WorkspaceMember[]
+  departments         Department[]
+  teams               Team[]
+  positions           Position[]
+  positionLevels      PositionLevel[]
+  employees           Employee[]
+  projects            Project[]
+  projectRoles        ProjectRole[]
+  leaveTypes          LeaveType[]
+  leaveQuotas         LeaveQuota[]
+  leaves              Leave[]
+  overtimePolicies    OvertimePolicy[]
+  overtimes           Overtime[]
+  approvalTemplates   ApprovalTemplate[]
+  approvals           Approval[]
+  settings            Settings[]
+  auditLogs           AuditLog[]
+  invitations         Invitation[]
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PlanType {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+model WorkspaceMember {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        MemberRole
+  joinedAt    DateTime  @default(now())
+  invitedBy   String?
+  status      MemberStatus @default(PENDING)
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([workspaceId, userId])
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+// Organization Structure Models
+model Department {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  code        String?
+  description String?
+  managerId   String?   // Employee ID who manages this department
+  parentId    String?   // For hierarchical departments
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  teams       Team[]
+  employees   Employee[]
+  parent      Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[] @relation("DepartmentHierarchy")
+  
+  @@unique([workspaceId, code])
+}
+
+model Team {
+  id          String    @id @default(cuid())
+  workspaceId String
+  departmentId String
+  name        String
+  description String?
+  leaderId    String?   // Employee ID who leads this team
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  department  Department @relation(fields: [departmentId], references: [id])
+  employees   Employee[]
+  
+  @@unique([workspaceId, departmentId, name])
+}
+
+model Position {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String
+  code            String?
+  description     String?
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  employees       Employee[]
+  employmentHistory EmploymentHistory[]
+  
+  @@unique([workspaceId, code])
+}
+
+model PositionLevel {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  level       Int       // Numerical level for sorting/hierarchy
+  description String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  employees   Employee[]
+  employmentHistory EmploymentHistory[]
+  
+  @@unique([workspaceId, level])
+}
+
+// Employee Management Models
+model Employee {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  userId            String?   @unique
+  employeeCode      String?
+  firstName         String
+  lastName          String
+  thaiFirstName     String?
+  thaiLastName      String?
+  nickname          String?
+  email             String
+  phone             String?
+  emergencyContact  String?
+  birthdate         DateTime?
+  gender            String?
+  nationalId        String?  // Will be encrypted
+  nationalIdIv      String?  // IV for encryption
+  passportNumber    String?  // Will be encrypted
+  passportNumberIv  String?  // IV for encryption
+  address           String?
+  taxId             String?
+  bankAccount       String?   // Will be encrypted
+  bankAccountIv     String?   // IV for encryption
+  bankName          String?
+  hireDate          DateTime
+  probationEndDate  DateTime?
+  resignDate        DateTime?
+  departmentId      String?
+  teamId            String?
+  positionId        String?
+  positionLevelId   String?
+  managerId         String?   // Employee ID of their manager
+  status            EmployeeStatus @default(ACTIVE)
+  employmentType    EmploymentType @default(FULL_TIME)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User?     @relation(fields: [userId], references: [id])
+  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  department        Department? @relation(fields: [departmentId], references: [id])
+  team              Team? @relation(fields: [teamId], references: [id])
+  position          Position? @relation(fields: [positionId], references: [id])
+  positionLevel     PositionLevel? @relation(fields: [positionLevelId], references: [id])
+  manager           Employee? @relation("EmployeeManagerRelation", fields: [managerId], references: [id])
+  subordinates      Employee[] @relation("EmployeeManagerRelation")
+  projectMembers    ProjectMember[]
+  employmentHistory EmploymentHistory[]
+  documents         EmployeeDocument[]
+  leaveQuotas       LeaveQuota[]
+  leaves            Leave[]
+  overtimes         Overtime[]
+  
+  @@unique([workspaceId, employeeCode])
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  PROBATION
+  TERMINATED
+  RESIGNED
+  PENDING
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+  FREELANCE
+}
+
+model EmploymentHistory {
+  id              String    @id @default(cuid())
+  employeeId      String
+  positionId      String
+  positionLevelId String?
+  departmentId    String?
+  startDate       DateTime
+  endDate         DateTime?
+  salary          Decimal?  @db.Decimal(10, 2)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  position        Position  @relation(fields: [positionId], references: [id])
+  positionLevel   PositionLevel? @relation(fields: [positionLevelId], references: [id])
+}
+
+model EmployeeDocument {
+  id          String    @id @default(cuid())
+  employeeId  String
+  type        String    // CONTRACT, CERTIFICATE, ID_CARD, etc.
+  name        String
+  filename    String    // Stored filename
+  mimeType    String
+  size        Int
+  url         String
+  uploadedBy  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// Project Management Models
+model Project {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String
+  code            String?
+  description     String?
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Decimal?  @db.Decimal(12, 2)
+  status          ProjectStatus @default(PLANNING)
+  priority        ProjectPriority @default(MEDIUM)
+  managerId       String?   // Employee ID of project manager
+  clientName      String?
+  clientContact   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  members         ProjectMember[]
+  
+  @@unique([workspaceId, code])
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model ProjectMember {
+  id          String    @id @default(cuid())
+  projectId   String
+  employeeId  String
+  roleId      String
+  allocation  Int       @default(100) // Percentage of time allocated
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  
+  // Relations
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  projectRole ProjectRole @relation(fields: [roleId], references: [id])
+  
+  @@unique([projectId, employeeId])
+}
+
+model ProjectRole {
+  id          String    @id @default(cuid())
+  workspaceId String?   // Make it optional for backward compatibility
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  projectMembers ProjectMember[]
+  
+  @@unique([workspaceId, name])
+}
+
+// Leave Management Models
+model LeaveType {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  code        String
+  description String?
+  color       String?
+  isPaid      Boolean   @default(true)
+  requiresApproval Boolean @default(true)
+  requiresAttachment Boolean @default(false)
+  maxDaysPerYear Int?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  leaveQuotas LeaveQuota[]
+  leaves      Leave[]
+  
+  @@unique([workspaceId, code])
+}
+
+model LeaveQuota {
+  id          String    @id @default(cuid())
+  workspaceId String
+  employeeId  String
+  leaveTypeId String
+  year        Int
+  total       Float
+  used        Float     @default(0)
+  pending     Float     @default(0)
+  remaining   Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  
+  @@unique([workspaceId, employeeId, leaveTypeId, year])
+}
+
+model Leave {
+  id          String    @id @default(cuid())
+  workspaceId String
+  employeeId  String
+  leaveTypeId String
+  startDate   DateTime
+  endDate     DateTime
+  halfDay     Boolean   @default(false)
+  duration    Float     // Number of days
+  reason      String?
+  attachment  String?
+  status      LeaveStatus @default(PENDING)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType   LeaveType @relation(fields: [leaveTypeId], references: [id])
+  approval    Approval?
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// Overtime Management Models
+model OvertimePolicy {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String
+  description     String?
+  rate            Float     // Multiplication factor for OT rate
+  minimumHours    Float     @default(0)
+  maximumHours    Float?    // Max OT hours per day
+  requiresApproval Boolean   @default(true)
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  overtimes       Overtime[]
+  
+  @@unique([workspaceId, name])
+}
+
+model Overtime {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  employeeId      String
+  policyId        String
+  date            DateTime
+  startTime       DateTime
+  endTime         DateTime
+  hours           Float
+  reason          String
+  status          OvertimeStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  overtimePolicy  OvertimePolicy @relation(fields: [policyId], references: [id])
+  approval        Approval?
+}
+
+enum OvertimeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// Approval Flow Models
+model ApprovalTemplate {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  entityType  String    // LEAVE, OVERTIME, etc.
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  steps       ApprovalStep[]
+  approvals   Approval[]
+  
+  @@unique([workspaceId, name])
+}
+
+model ApprovalStep {
+  id                  String    @id @default(cuid())
+  approvalTemplateId  String
+  stepNumber          Int
+  approverType        ApproverType
+  approverId          String?   // User, Role or Position ID depending on approverType
+  backup1Id           String?   // Backup approver 1
+  backup2Id           String?   // Backup approver 2
+  timeLimit           Int?      // Hours to approve before escalation
+  
+  // Relations
+  approvalTemplate    ApprovalTemplate @relation(fields: [approvalTemplateId], references: [id], onDelete: Cascade)
+  
+  @@unique([approvalTemplateId, stepNumber])
+}
+
+enum ApproverType {
+  DIRECT_MANAGER
+  DEPARTMENT_HEAD
+  SPECIFIC_USER
+  POSITION
+  ROLE
+}
+
+model Approval {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  templateId        String
+  entityType        String    // LEAVE, OVERTIME, etc.
+  entityId          String    // ID of the entity being approved
+  requesterId       String    // Employee who requested
+  currentStep       Int       @default(1)
+  status            ApprovalStatus @default(PENDING)
+  leaveId           String?   @unique
+  overtimeId        String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  workspace         Workspace @relation(fields: [workspaceId], references: [id])
+  template          ApprovalTemplate @relation(fields: [templateId], references: [id])
+  leave             Leave? @relation(fields: [leaveId], references: [id])
+  overtime          Overtime? @relation(fields: [overtimeId], references: [id])
+  actions           ApprovalAction[]
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ApprovalAction {
+  id            String    @id @default(cuid())
+  approvalId    String
+  userId        String
+  step          Int
+  action        String    // APPROVE, REJECT
+  comment       String?
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  approval      Approval  @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+// Settings & Miscellaneous
+model Settings {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  category      String    // GENERAL, LEAVE, OVERTIME, etc.
+  key           String
+  value         String    @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  
+  @@unique([workspaceId, category, key])
+}
+
+// PDPA & Security
+model UserConsent {
+  id            String    @id @default(cuid())
+  userId        String
+  purpose       String
+  consentGiven  Boolean
+  timestamp     DateTime
+  ipAddress     String?
+  
+  // Relations
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+model ActivityLog {
+  id            String    @id @default(cuid())
+  userId        String
+  action        String
+  entity        String
+  entityId      String
+  details       String?   @db.Text
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  userId        String
+  action        String    // CREATE, READ, UPDATE, DELETE
+  resource      String    // Table/model name
+  resourceId    String?
+  details       String?   @db.Text
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+}
+
+// เพิ่มโมเดลสำหรับการเชิญพนักงาน
+model Invitation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  email       String
+  code        String   // รหัสเชิญที่เข้ารหัสแล้ว
+  type        InvitationType  // ประเภทการเชิญ
+  status      InvitationStatus @default(PENDING)
+  data        String?  @db.Text // ข้อมูลเพิ่มเติมในรูปแบบ JSON
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  
+  @@index([email, status])
+  @@index([code])
+}
+
+enum InvitationType {
+  EMPLOYEE      // เชิญพนักงานที่มีบัญชีอยู่แล้ว
+  EMPLOYEE_NEW  // เชิญพนักงานใหม่ที่ยังไม่มีบัญชี
+  WORKSPACE     // เชิญเข้าร่วม workspace
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}

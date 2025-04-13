@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 800 600" fill="none">
+  <rect width="800" height="600" fill="#E9EFFD"/>
+  
+  <!-- Background Elements -->
+  <circle cx="200" cy="200" r="120" fill="#D1E0FB" />
+  <circle cx="600" cy="450" r="150" fill="#D1E0FB" />
+  <circle cx="700" cy="100" r="80" fill="#D1E0FB" />
+  
+  <!-- People collaborating -->
+  <g transform="translate(250, 150)">
+    <!-- Person 1 -->
+    <circle cx="50" cy="50" r="40" fill="#4B7BF5" />
+    <circle cx="50" cy="30" r="15" fill="#FFFFFF" />
+    <rect x="35" y="50" width="30" height="40" rx="5" fill="#FFFFFF" />
+    
+    <!-- Person 2 -->
+    <circle cx="150" cy="50" r="40" fill="#6097F6" />
+    <circle cx="150" cy="30" r="15" fill="#FFFFFF" />
+    <rect x="135" y="50" width="30" height="40" rx="5" fill="#FFFFFF" />
+    
+    <!-- Person 3 -->
+    <circle cx="250" cy="50" r="40" fill="#2563EB" />
+    <circle cx="250" cy="30" r="15" fill="#FFFFFF" />
+    <rect x="235" y="50" width="30" height="40" rx="5" fill="#FFFFFF" />
+    
+    <!-- Connection Lines -->
+    <line x1="90" y1="50" x2="110" y2="50" stroke="#4B7BF5" stroke-width="5" />
+    <line x1="190" y1="50" x2="210" y2="50" stroke="#4B7BF5" stroke-width="5" />
+  </g>
+  
+  <!-- Project board -->
+  <g transform="translate(200, 300)">
+    <rect x="0" y="0" width="400" height="200" rx="10" fill="#FFFFFF" stroke="#4B7BF5" stroke-width="3"/>
+    
+    <!-- Header -->
+    <rect x="0" y="0" width="400" height="40" rx="10" fill="#4B7BF5"/>
+    <text x="20" y="25" font-family="sans-serif" font-size="18" fill="white">Team Project Board</text>
+    
+    <!-- Tasks -->
+    <rect x="20" y="60" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="150" y="60" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="280" y="60" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    
+    <rect x="20" y="110" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="150" y="110" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="280" y="110" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    
+    <rect x="20" y="160" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="150" y="160" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+    <rect x="280" y="160" width="100" height="30" rx="5" fill="#E9EFFD" stroke="#4B7BF5" stroke-width="1"/>
+  </g>
+</svg> 
